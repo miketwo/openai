@@ -1,9 +1,10 @@
 #!/usr/bin/env python
+from __future__ import division
 import time
 import tensorflow as tf
 
 
-class Trainer:
+class Trainer(object):
 
     def __init__(self, agent):
         self.agent = agent
@@ -12,7 +13,7 @@ class Trainer:
 
     def run(self):
         with tf.Session() as sess:
-            sess.run(tf.initialize_all_variables())
+            sess.run(tf.global_variables_initializer())
             self.agent.randomRestart()
 
             successes = 0
@@ -38,16 +39,18 @@ class Trainer:
             sample_failure = 0
             print "\nstart training..."
             start_time = time.time()
+            loop_start_time = time.time()
             for i in xrange(self.agent.train_steps):
                 # annealing learning rate
+                current_step = i+1
                 lr = self.agent.trainEps(i)
                 state, action, reward, next_state, terminal = self.agent.observe(lr)
 
-                if len(self.agent.memory) > self.agent.batch_size and (i+1) % self.agent.update_freq == 0:
+                if len(self.agent.memory) > self.agent.batch_size and current_step % self.agent.update_freq == 0:
                     sample_success, sample_failure, loss = self.agent.doMinibatch(sess, sample_success, sample_failure)
                     total_loss += loss
 
-                if (i+1) % self.agent.steps == 0:
+                if current_step % self.agent.steps == 0:
                     self.agent.copy_weights(sess)
 
                 if reward == 1:
@@ -55,20 +58,23 @@ class Trainer:
                 elif terminal:
                     failures += 1
                 
-                if ((i+1) % self.agent.save_weights == 0):
-                    self.agent.save(self.saver, sess, i+1)
+                if (current_step % self.agent.save_weights == 0):
+                    self.agent.save(self.saver, sess, current_step)
 
-                if ((i+1) % self.agent.batch_size == 0):
+                if (current_step % self.agent.batch_size == 0):
                     avg_loss = total_loss / self.agent.batch_size
                     end_time = time.time()
-                    print "\nTraining step: ", i+1,\
-                          "\nmemory size: ", len(self.agent.memory),\
+                    elapsed_time = end_time-start_time
+                    print "\nTraining step: ", current_step, " of ", self.agent.train_steps,\
+                          "\nMemory size: ", len(self.agent.memory),\
                           "\nLearning rate: ", lr,\
                           "\nSuccesses: ", successes,\
                           "\nFailures: ", failures,\
                           "\nSample successes: ", sample_success,\
                           "\nSample failures: ", sample_failure,\
                           "\nAverage batch loss: ", avg_loss,\
-                          "\nBatch training time: ", (end_time-start_time)/self.agent.batch_size, "s"
-                    start_time = time.time()
+                          "\nElapsed time: ", elapsed_time, "s"\
+                          "\nBatch training time: ", (end_time-loop_start_time)/self.agent.batch_size, "s"\
+                          "\nRemaining time: ", ((elapsed_time/current_step)*self.agent.train_steps), "s"
+                    loop_start_time = time.time()
                     total_loss = 0
