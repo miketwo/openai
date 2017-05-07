@@ -7,7 +7,7 @@ from buff import Buffer
 from memory import Memory
 
 
-class DQN:
+class DQN(object):
 
     def __init__(self, env, params):
         self.env = env
@@ -105,8 +105,6 @@ class DQN:
         reward = np.clip(reward, -1.0, 1.0)
 
         self.memory.add(state, action, reward, next_state, terminal)
-        
-        
         return state, action, reward, next_state, terminal
 
     def doMinibatch(self, sess, successes, failures):
